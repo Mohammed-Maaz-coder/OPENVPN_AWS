@@ -1,0 +1,103 @@
+# OpenVPN Setup Commands on Ubuntu
+
+# 1. Update system and install required packages
+sudo apt-get update
+sudo apt-get install -y openvpn easy-rsa
+
+# 2. Verify installation
+openvpn --version
+
+# 3. Setup Easy-RSA directory
+make-cadir ~/easy-rsa
+cd ~/easy-rsa
+
+# 4. Initialize PKI (Public Key Infrastructure)
+source vars
+./easyrsa init-pki
+
+# 5. Build Certificate Authority (CA)
+./easyrsa build-ca
+# Press Enter for defaults (no password for simplicity)
+
+# 6. Generate Server Certificate & Key
+./easyrsa gen-req server nopass
+./easyrsa sign-req server server
+
+# 7. Generate Diffie-Hellman parameters
+./easyrsa gen-dh
+
+# 8. Generate TLS Auth Key
+openvpn --genkey tls-auth ta.key
+
+# 9. Generate Client Certificate & Key
+./easyrsa gen-req client nopass
+./easyrsa sign-req client client
+
+# 10. Copy required files to OpenVPN directory
+sudo cp ~/easy-rsa/pki/ca.crt /etc/openvpn/
+sudo cp ~/easy-rsa/pki/issued/server.crt /etc/openvpn/
+sudo cp ~/easy-rsa/pki/private/server.key /etc/openvpn/
+sudo cp ~/easy-rsa/pki/dh.pem /etc/openvpn/
+sudo cp ~/easy-rsa/ta.key /etc/openvpn/
+
+# 11. Create and edit server configuration file
+sudo nano /etc/openvpn/server.conf
+
+# (Paste server configuration manually inside file)
+
+# 12. Enable IP forwarding
+sudo sysctl -w net.ipv4.ip_forward=1
+sudo echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
+
+# 13. Configure firewall (iptables & UFW)
+sudo iptables -t nat -A POSTROUTING -s 172.31.0.0/24 -o ens5 -j MASQUERADE
+
+sudo ufw allow 1194/udp
+sudo ufw allow OpenSSH
+sudo ufw enable
+
+# 14. Modify UFW rules manually
+# Edit file: /etc/ufw/before.rules
+
+# Add the following before *filter section:
+# *nat
+# :POSTROUTING ACCEPT [0:0]
+# -A POSTROUTING -s 172.31.0.0/8 -o ens5 -j MASQUERADE
+# COMMIT
+
+# Also update:
+# /etc/default/ufw
+# Change:
+# DEFAULT_FORWARD_POLICY="ACCEPT"
+
+# 15. Start and enable OpenVPN service
+sudo systemctl start openvpn@server
+sudo systemctl enable openvpn@server
+
+# ---------------- CLIENT CONFIG ----------------
+
+# Client configuration file (client.conf or .ovpn)
+
+client
+dev tun
+proto udp
+remote <server-public-ip> 1194
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+
+ca ca.crt
+cert client.crt
+key client.key
+tls-auth ta.key 1
+
+cipher AES-256-CBC
+remote-cert-tls server
+verb 3
+
+# 16. Transfer these files to client machine:
+# ~/easy-rsa/pki/ca.crt
+# ~/easy-rsa/pki/issued/client.crt
+# ~/easy-rsa/pki/private/client.key
+# ~/easy-rsa/ta.key
