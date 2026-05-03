@@ -10,6 +10,16 @@ This project focuses on setting up a **secure remote access VPN** using OpenVPN.
 
 ---
 
+## 🏗️ Architecture Diagram
+
+<p align="center">
+  <img src="architecture.png" alt="OpenVPN Architecture" width="800"/>
+</p>
+
+> This diagram illustrates the secure communication between client and server using an encrypted VPN tunnel with TLS authentication and AES-256 encryption.
+
+---
+
 ## 🚀 Features
 
 - 🔒 Secure VPN using OpenVPN
